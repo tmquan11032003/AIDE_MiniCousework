@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# Data outputs / generated artifacts (giữ code generator, không commit dữ liệu sinh ra)
+data/
+*.parquet
+*.avro
+*.log
+duckdb/
+*.duckdb
+
+# Secrets / config local
+.env
+*.local
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Claude Code local settings (giữ CLAUDE.md + rules + agents, bỏ settings cá nhân máy)
+.claude/settings.local.json
