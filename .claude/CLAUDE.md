@@ -6,6 +6,10 @@ Hướng dẫn cho Claude Code khi làm việc trong repo này. Đọc file này
 
 Các rule chi tiết được tách theo chủ đề trong [rules/](rules/) và được nạp qua `@import` bên dưới. Khi cần sửa một quy tắc, sửa đúng file rule tương ứng thay vì viết dồn vào đây.
 
+## Triggers
+
+- Khi tôi nói **"review status"**, hãy đọc [skills/review_current_status.md](skills/review_current_status.md) và thực hiện theo đúng format trong đó.
+
 ## Rules
 
 @rules/01-context.md
