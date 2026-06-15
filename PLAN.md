@@ -8,8 +8,8 @@ Mini-coursework _Engineering for Data and AI_ (cá nhân, chạy local), domain 
 Starbucks**. Mục tiêu học: dựng một **lakehouse end-to-end** sát production với cả **batch + streaming**.
 
 **Thay đổi scope:** nâng từ stack nhẹ (Polars+DuckDB thuần) lên **lakehouse trên Docker**:
-**Kafka + Flink + Spark + MinIO + Apache Iceberg** (+ Trino optional). Vẫn giữ **Polars** (generator) +
-**DuckDB** (dev/test/serving nhanh).
+**Kafka + Flink + Spark + MinIO + Apache Iceberg** (+ Trino optional). Generator dùng **pandas** (đơn
+giản, dễ học) + **DuckDB** (dev/test/serving nhanh).
 
 **Ràng buộc thực tế:** máy 8GB RAM cho Docker + mạng chậm (kéo image lâu) → **phân pha**, không bật tất cả
 cùng lúc, pin image tag để tái lập.
@@ -24,13 +24,13 @@ cùng lúc, pin image tag để tái lập.
 | Batch engine        | **Spark** (local mode)                           | Silver/Gold ETL                                            |
 | Object storage      | **MinIO** (S3-compatible)                        | Lưu mọi layer                                              |
 | Serving/query       | **DuckDB** (dev) + **Trino** (optional, Phase C) | DuckDB đọc thẳng Iceberg/Parquet trên MinIO                |
-| Generator + dev     | **giữ Polars + DuckDB**                          | Không thay thế                                             |
+| Generator           | **pandas + pyarrow** (function thuần, comment)   | Người mới học — dễ đọc/trình bày hơn class+Polars          |
 | Môi trường Python   | **pip + venv** (`requirements.txt`)              | Conda quá chậm trên mạng máy này                           |
 
 ## 🔄 Sơ đồ dòng data hoàn chỉnh (end-to-end)
 
 ```
-┌──────────────────────── SOURCE (Python/Polars — Section 01, M1/M2) ───────────────────────┐
+┌──────────────────────── SOURCE (Python/pandas — Section 01, M1/M2) ───────────────────────┐
 │  Offline batch  : stores, products, customers, employees, orders, order_items, payments    │
 │                   → Parquet (seed=42, có skew/dup/schema-evolution)                         │
 │  Streaming      : event generator (app_view, add_to_cart, mobile_order, checkout, ...)      │
@@ -72,14 +72,14 @@ sau đó chạy Spark batch (Silver/Gold). Kafka KRaft (no ZooKeeper). Trino coo
 
 ```
 AIDE_Minicoursework/
-├── requirements.txt                  # Python env (pip+venv): Polars, DuckDB, kafka client...
+├── requirements.txt                  # Python env (pip+venv): pandas, pyarrow, duckdb...
 ├── docker/
 │   ├── docker-compose.yml            # MinIO + Iceberg REST + Kafka(KRaft) + Flink + Spark (+ Trino)
 │   ├── .env                          # pin image tags + cấu hình RAM (heap opts)
 │   └── conf/                         # cấu hình từng service (trino catalog, flink, spark-defaults)
 ├── config/generator.yaml             # seed + tham số sinh + tỉ lệ lỗi (đã có)
 ├── src/
-│   ├── generators/                   # Polars generator (Section 01) — đã có skeleton
+│   ├── generate_offline.py           # pandas generator (Section 01) — function thuần
 │   ├── streaming/producer.py         # đọc NDJSON → publish Kafka
 │   ├── flink/                        # Flink jobs: bronze ingest, windowing
 │   ├── spark/                        # Spark jobs: bronze(batch), silver, gold, features
@@ -104,7 +104,7 @@ out-of-order, burst, missing. Chi tiết grain/cột chốt khi vào generator.
 
 **M0 — Scaffolding & môi trường** ✅ **(XONG)** — pip+venv, `src/` skeleton, CLI, smoke tests pass.
 
-**M1 — Section 01: Offline generator (Polars → Parquet)**
+**M1 — Section 01: Offline generator (pandas → Parquet)** ✅ **(XONG)**
 Sinh 7 bảng + chèn challenge offline (skew, cardinality, schema evolution, duplicates). Reproducible.
 
 **M2 — Section 01: Streaming generator (NDJSON) + design 01**
