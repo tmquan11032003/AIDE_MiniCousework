@@ -1,45 +1,47 @@
 """
-Tính các chỉ số chất lượng / challenge từ dữ liệu offline và ghi ra Markdown.
+Compute data-quality / challenge metrics from the offline tables and write Markdown.
 
-Dùng làm bằng chứng (evidence) reproducible cho Section 01.
+Reproducible evidence for Section 01.
 """
 
 import os
 
 
 def offline_report_text(tables, cfg):
-    """Trả về nội dung Markdown của quality report."""
+    """Return the quality report as a Markdown string."""
     orders = tables["orders"]
     items = tables["order_items"]
     products = tables["products"]
     customers = tables["customers"]
     n = len(orders)
 
-    # Skew cửa hàng: top-N cửa hàng chiếm bao nhiêu % đơn
+    # store skew: share of orders going to the top-N stores
     top_n = cfg["skew"]["n_top_stores"]
     top_share = orders["store_id"].value_counts().head(top_n).sum() / n
-    # Skew giờ cao điểm
+    # peak-hour skew
     peak = cfg["skew"]["peak_hours"]
     peak_share = orders["order_timestamp"].dt.hour.isin(peak).mean()
-    # Skew category coffee
+    # coffee category skew
     coffee = (products["category"] == "coffee").mean()
-    # Schema evolution: đơn pre-app có channel NULL
+    # schema evolution: pre-app orders have NULL channel
     pre_app = orders["channel"].isna().mean()
-    # Duplicates trong order_items
+    # duplicate rate in order_items
     dup = (len(items) - items["order_item_id"].nunique()) / len(items)
-    # Missing
+    # missing values
     miss_city = customers["city"].isna().mean()
-    # Khách vãng lai
+    # guest orders (no loyalty customer)
     guest = orders["customer_id"].isna().mean()
 
+    sk = cfg["skew"]
+    iss = cfg["offline_issues"]
     rows = [
         ("Tổng rows (7 bảng)", f"{sum(len(t) for t in tables.values()):,}", "—"),
-        ("Skew cửa hàng (top-N)", f"{top_share:.0%}", f"~{cfg['skew']['top_store_share']:.0%}"),
-        ("Skew giờ cao điểm", f"{peak_share:.0%}", f"~{cfg['skew']['peak_hour_share']:.0%}"),
-        ("Skew category coffee", f"{coffee:.0%}", f"~{cfg['skew']['coffee_category_share']:.0%}"),
+        ("Skew cửa hàng (top-N)", f"{top_share:.0%}", f"~{sk['top_store_share']:.0%}"),
+        ("Skew giờ cao điểm", f"{peak_share:.0%}", f"~{sk['peak_hour_share']:.0%}"),
+        ("Skew category coffee", f"{coffee:.0%}", f"~{sk['coffee_category_share']:.0%}"),
         ("Schema evolution (channel NULL)", f"{pre_app:.0%}", "~50%"),
-        ("Duplicates order_items", f"{dup:.1%}", f"~{cfg['offline_issues']['duplicate_rate']:.0%}"),
-        ("Missing customers.city", f"{miss_city:.1%}", f"~{cfg['offline_issues']['missing_rate']:.0%}"),
+        ("Duplicates order_items", f"{dup:.1%}", f"~{iss['duplicate_rate']:.0%}"),
+        ("Missing customers.city", f"{miss_city:.1%}", f"~{iss['missing_rate']:.0%}"),
         ("Khách vãng lai (NULL)", f"{guest:.0%}", "~30%"),
         ("Cardinality order_id (unique)", f"{orders['order_id'].nunique():,}", f"{n:,}"),
     ]

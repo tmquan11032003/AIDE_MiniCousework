@@ -1,23 +1,21 @@
 """
-Sinh dữ liệu OFFLINE (batch) cho chuỗi quán cà phê -> Parquet.
+Offline (batch) data generator for the coffee-chain dataset -> Parquet.
 
-Viết theo kiểu ĐƠN GIẢN: mỗi bảng một hàm `gen_*()` trả về một pandas DataFrame,
-comment giải thích rõ. Tất cả dùng chung seed cố định để TÁI LẬP (chạy lại ra y hệt).
+7 tables: stores, products, customers, employees, orders, order_items, payments.
+Fixed seed -> fully reproducible.
 
-7 bảng: stores, products, customers, employees, orders, order_items, payments.
+Injected data challenges:
+  - Skew              : ~75% of orders to a few "busy" stores; ~70% of products are coffee;
+                        ~55% of orders fall in the 7-9h morning peak.
+  - High cardinality  : order_id / order_item_id / customer_id are (near) unique.
+  - Schema evolution  : orders BEFORE the app-launch date have no `channel` /
+                        `membership_tier_at_order` (one Parquet file per month; older
+                        files simply do not contain these two columns).
+  - Duplicates        : ~2% of order_items rows are exact duplicates.
+  - Missing values    : ~1% NULL in a few optional columns.
+  - event vs ingest   : `*_timestamp` (event time) vs `created_ts` (write/ingest time, later).
 
-Các "thách thức dữ liệu" (data challenges) cố tình chèn vào:
-  - Skew         : ~75% đơn rơi vào vài cửa hàng lớn; ~70% sản phẩm là coffee;
-                   ~55% đơn vào giờ cao điểm 7-9h sáng.
-  - High cardinality : order_id / order_item_id / customer_id gần như unique.
-  - Schema evolution : đơn TRƯỚC ngày ra app thiếu cột `channel` + `membership_tier_at_order`
-                       (ghi mỗi tháng 1 file parquet; file cũ không có 2 cột này).
-  - Duplicates   : ~2% dòng order_items bị nhân bản y hệt.
-  - Missing      : ~1% giá trị NULL ở vài cột optional.
-  - event-time vs ingest-time : `*_timestamp` (lúc xảy ra) vs `created_ts` (lúc ghi, trễ chút).
-
-Cách chạy:
-    python -m src.run offline
+Run: python -m src.run offline
 """
 
 import os
@@ -26,11 +24,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-# ------------------------------------------------------------------------------
-# Hằng số domain (để ở đây cho dễ chỉnh)
-# ------------------------------------------------------------------------------
+# --- Domain constants ---
 
-# Thành phố + trọng số (vài thành phố lớn chiếm phần lớn -> tạo skew tự nhiên)
 CITIES = ["HCMC", "Hanoi", "Da-Nang", "Bien-Hoa", "Hai-Phong", "Can-Tho",
           "Nha-Trang", "Hue", "Vung-Tau", "Da-Lat"]
 CITY_W = [0.34, 0.24, 0.10, 0.06, 0.05, 0.05, 0.04, 0.04, 0.04, 0.04]
@@ -47,7 +42,7 @@ ROLE_W = [0.6, 0.25, 0.1, 0.05]
 TIERS = ["none", "green", "gold"]
 TIER_W = [0.5, 0.35, 0.15]
 
-# Kênh bán: chỉ có TỪ KHI ra mobile app -> dùng cho schema evolution
+# Sales channel: only exists from the mobile-app launch onward (drives schema evolution).
 CHANNELS = ["in_store", "mobile_app", "drive_thru", "delivery"]
 CHANNEL_W = [0.55, 0.25, 0.12, 0.08]
 
@@ -57,7 +52,7 @@ STATUS_W = [0.93, 0.04, 0.03]
 PAY_METHODS = ["card", "cash", "wallet", "giftcard"]
 PAY_METHOD_W = [0.4, 0.3, 0.2, 0.1]
 
-# Menu: (tên, category, giá gốc nghìn VND, có size?). Coffee có nhiều món hơn để chiếm tỉ trọng cao.
+# Menu: (name, category, base_price_k_vnd, has_size). More coffee items -> coffee skew.
 MENU = [
     ("Espresso", "coffee", 45, True), ("Americano", "coffee", 50, True),
     ("Cappuccino", "coffee", 60, True), ("Latte", "coffee", 65, True),
@@ -74,18 +69,15 @@ MENU = [
 SIZES = ["S", "M", "L"]
 SIZE_MULT = {"S": 1.0, "M": 1.2, "L": 1.4}
 
-# Tên giả đơn giản (không cần thư viện ngoài) -> ghép họ + tên
 LAST = ["Nguyen", "Tran", "Le", "Pham", "Hoang", "Vu", "Dang", "Bui", "Do", "Ngo"]
 FIRST = ["An", "Binh", "Chi", "Dung", "Giang", "Ha", "Khoa", "Lan", "Minh", "Nam",
          "Oanh", "Phuc", "Quan", "Trang", "Yen"]
 
 
-# ------------------------------------------------------------------------------
-# Generator từng bảng (mỗi hàm trả về 1 DataFrame)
-# ------------------------------------------------------------------------------
+# --- Per-table generators ---
 
 def gen_stores(n, start_date):
-    """Bảng cửa hàng: 1 dòng / cửa hàng."""
+    # CHALLENGE Skew: city sampled with skewed weights (CITY_W).
     cities = np.random.choice(CITIES, n, p=CITY_W)
     return pd.DataFrame({
         "store_id": [f"S{i:04d}" for i in range(1, n + 1)],
@@ -93,14 +85,12 @@ def gen_stores(n, start_date):
         "city": cities,
         "region": [REGION[c] for c in cities],
         "store_type": np.random.choice(STORE_TYPES, n, p=STORE_TYPE_W),
-        # open_date: rải trong ~3 năm trước start_date
         "open_date": start_date - pd.to_timedelta(np.random.randint(30, 365 * 3, n), unit="D"),
     })
 
 
 def gen_products(n, coffee_share):
-    """Bảng sản phẩm: 1 dòng / món. Skew: coffee chiếm ~coffee_share."""
-    # Tính trọng số mỗi món sao cho tổng coffee = coffee_share
+    # CHALLENGE Skew: per-item weights so that coffee makes up ~coffee_share of products.
     cats = [m[1] for m in MENU]
     other = 1.0 - coffee_share
     cat_share = {"coffee": coffee_share, "tea": other * 0.5,
@@ -110,19 +100,17 @@ def gen_products(n, coffee_share):
     w = w / w.sum()
 
     idx = np.random.choice(len(MENU), n, p=w)
-    names = [f"{MENU[t][0]} v{k % 7 + 1}" for k, t in enumerate(idx)]
     return pd.DataFrame({
         "product_id": [f"P{i:04d}" for i in range(1, n + 1)],
-        "product_name": names,
+        "product_name": [f"{MENU[t][0]} v{k % 7 + 1}" for k, t in enumerate(idx)],
         "category": [MENU[t][1] for t in idx],
         "base_price": [round(MENU[t][2] * np.random.uniform(0.95, 1.05), 1) for t in idx],
         "has_size": [MENU[t][3] for t in idx],
-        "is_active": np.random.random(n) > 0.05,  # ~5% ngừng bán
+        "is_active": np.random.random(n) > 0.05,
     })
 
 
 def gen_customers(n, start_date, miss_rate):
-    """Bảng khách loyalty: 1 dòng / khách. Có PII (full_name, email). Chèn missing values."""
     df = pd.DataFrame({
         "customer_id": [f"C{i:06d}" for i in range(1, n + 1)],
         "full_name": [f"{np.random.choice(LAST)} {np.random.choice(FIRST)}" for _ in range(n)],
@@ -130,12 +118,11 @@ def gen_customers(n, start_date, miss_rate):
         "city": np.random.choice(CITIES, n, p=CITY_W),
         "membership_tier": np.random.choice(TIERS, n, p=TIER_W),
         "marketing_opt_in": np.random.random(n) < 0.6,
-        # signup_ts: rải trong ~2 năm trước start
         "signup_ts": start_date - pd.to_timedelta(
             np.random.randint(0, 2 * 365 * 86400, n), unit="s"),
     })
-    # Missing values: đục NULL ~miss_rate ở city + marketing_opt_in.
-    # (Cột bool không chứa được None nên đổi sang object trước.)
+    # CHALLENGE Missing values: NULL ~miss_rate of city + marketing_opt_in
+    # (cast bool -> object first so it can hold None).
     df["marketing_opt_in"] = df["marketing_opt_in"].astype(object)
     df.loc[np.random.random(n) < miss_rate, "city"] = None
     df.loc[np.random.random(n) < miss_rate, "marketing_opt_in"] = None
@@ -143,7 +130,6 @@ def gen_customers(n, start_date, miss_rate):
 
 
 def gen_employees(n, store_ids, start_date):
-    """Bảng nhân viên: 1 dòng / người, thuộc 1 cửa hàng."""
     return pd.DataFrame({
         "employee_id": [f"E{i:04d}" for i in range(1, n + 1)],
         "full_name": [f"{np.random.choice(LAST)} {np.random.choice(FIRST)}" for _ in range(n)],
@@ -155,25 +141,20 @@ def gen_employees(n, store_ids, start_date):
 
 
 def gen_orders(n, stores, customers, employees, cfg):
-    """Bảng đơn hàng: 1 dòng / đơn. Đây là nơi chèn nhiều challenge nhất."""
     skew = cfg["skew"]
     start = pd.Timestamp(cfg["history"]["start_date"])
     app_launch = pd.Timestamp(cfg["history"]["app_launch_date"])
     days = cfg["history"]["days"]
-
     store_ids = stores["store_id"].to_numpy()
 
-    # --- Skew cửa hàng: chọn vài cửa hàng "đông khách" nhận phần lớn đơn ---
+    # CHALLENGE Skew (store): top_store_share of orders go to n_top_stores busy stores.
     top_ids = np.random.choice(store_ids, skew["n_top_stores"], replace=False)
     other_ids = np.setdiff1d(store_ids, top_ids)
     is_top = np.random.random(n) < skew["top_store_share"]
-    store_col = np.where(
-        is_top,
-        np.random.choice(top_ids, n),
-        np.random.choice(other_ids, n),
-    )
+    store_col = np.where(is_top, np.random.choice(top_ids, n),
+                         np.random.choice(other_ids, n))
 
-    # --- Skew giờ cao điểm: ~peak_hour_share đơn vào giờ 7-9h sáng ---
+    # CHALLENGE Skew (time): peak_hour_share of orders fall in the morning peak hours.
     peak = skew["peak_hours"]
     non_peak = [h for h in range(6, 23) if h not in peak]
     is_peak = np.random.random(n) < skew["peak_hour_share"]
@@ -181,9 +162,9 @@ def gen_orders(n, stores, customers, employees, cfg):
     day = np.random.randint(0, days, n)
     sec = day * 86400 + hour * 3600 + np.random.randint(0, 3600, n)
     order_ts = start + pd.to_timedelta(sec, unit="s")
-    order_date = order_ts.normalize()  # bỏ phần giờ, còn ngày
+    order_date = order_ts.normalize()
 
-    # --- Khách loyalty (70%) vs vãng lai (30%, customer_id = NULL) ---
+    # CHALLENGE High cardinality + nullable FK: ~30% guest orders (customer_id = NULL).
     cust_ids = customers["customer_id"].to_numpy()
     cust_tiers = customers["membership_tier"].to_numpy()
     has_loyalty = np.random.random(n) < 0.7
@@ -191,7 +172,7 @@ def gen_orders(n, stores, customers, employees, cfg):
     customer_col = np.where(has_loyalty, cust_ids[cidx], None)
     tier_snapshot = np.where(has_loyalty, cust_tiers[cidx], None)
 
-    # --- Nhân viên phục vụ: phải thuộc đúng cửa hàng của đơn ---
+    # Employee must belong to the order's store.
     emp_ids = employees["employee_id"].to_numpy()
     emp_store = employees["store_id"].to_numpy()
     employee_col = np.empty(n, dtype=object)
@@ -202,14 +183,14 @@ def gen_orders(n, stores, customers, employees, cfg):
         mask = store_col == s
         employee_col[mask] = np.random.choice(pool, mask.sum())
 
-    # --- Schema evolution: channel + tier chỉ có TỪ ngày ra app ---
+    # CHALLENGE Schema evolution: channel + tier exist only from app_launch onward.
     pre_app = order_date < app_launch
     channel = np.random.choice(CHANNELS, n, p=CHANNEL_W).astype(object)
     channel[pre_app] = None
     membership = tier_snapshot.copy()
     membership[pre_app] = None
 
-    # --- ingest time trễ 0-5 phút so với event time ---
+    # CHALLENGE event vs ingest time: created_ts is 0-300s after order_timestamp.
     created_ts = order_ts + pd.to_timedelta(np.random.randint(0, 300, n), unit="s")
 
     return pd.DataFrame({
@@ -227,11 +208,8 @@ def gen_orders(n, stores, customers, employees, cfg):
 
 
 def gen_order_items(orders, products, dup_rate):
-    """Bảng dòng món: 1 dòng / món trong đơn. Chèn duplicates ~dup_rate."""
     order_ids = orders["order_id"].to_numpy()
     order_created = orders["created_ts"].to_numpy()
-
-    # mỗi đơn 1-4 món
     n_items = np.random.randint(1, 5, len(order_ids))
     oid = np.repeat(order_ids, n_items)
     created = np.repeat(order_created, n_items)
@@ -245,7 +223,6 @@ def gen_order_items(orders, products, dup_rate):
     has_size = p_hassize[pidx]
     size = np.where(has_size, np.random.choice(SIZES, m), None)
     mult = np.array([SIZE_MULT.get(s, 1.0) for s in size])
-
     qty = np.random.choice([1, 2, 3], m, p=[0.7, 0.22, 0.08])
     unit_price = np.round(p_price[pidx] * mult, 1)
     has_disc = np.random.random(m) < 0.15
@@ -264,7 +241,7 @@ def gen_order_items(orders, products, dup_rate):
         "created_ts": created,
     })
 
-    # Duplicates: nhân bản y hệt ~dup_rate dòng (để tầng Silver phải dedup)
+    # CHALLENGE Duplicates: append exact copies of ~dup_rate of the rows.
     n_dup = int(m * dup_rate)
     if n_dup:
         dup_rows = df.iloc[np.random.choice(m, n_dup, replace=False)]
@@ -273,8 +250,6 @@ def gen_order_items(orders, products, dup_rate):
 
 
 def gen_payments(orders, items):
-    """Bảng thanh toán: 1 dòng / lần trả tiền. ~5% đơn có 1 lần FAIL trước khi success."""
-    # amount = tổng line_amount của đơn
     totals = items.groupby("order_id")["line_amount"].sum().round(1)
     base = orders[["order_id", "order_timestamp", "status"]].copy()
     base["amount"] = base["order_id"].map(totals).fillna(0.0)
@@ -293,7 +268,7 @@ def gen_payments(orders, items):
         "payment_status": status,
     })
 
-    # ~5% đơn (không bị huỷ) thêm 1 dòng thất bại TRƯỚC đó
+    # ~5% of (non-cancelled) orders get an extra failed attempt before success.
     retry = (np.random.random(n) < 0.05) & (base["status"].to_numpy() != "cancelled")
     fails = pd.DataFrame({
         "order_id": base["order_id"].to_numpy()[retry],
@@ -312,19 +287,17 @@ def gen_payments(orders, items):
     return df
 
 
-# ------------------------------------------------------------------------------
-# Ghi Parquet
-# ------------------------------------------------------------------------------
+# --- Write Parquet ---
 
 def write_parquet(df, path):
     pq.write_table(pa.Table.from_pandas(df, preserve_index=False), path)
 
 
 def write_orders_by_month(orders, out_dir, app_launch_date):
-    """Ghi orders thành mỗi tháng 1 file. File TRƯỚC ngày ra app bỏ 2 cột mới
-    -> mô phỏng schema evolution (giống dữ liệu lịch sử thật)."""
+    # CHALLENGE Schema evolution: one file per month; months before app launch
+    # are written WITHOUT the channel / membership_tier_at_order columns.
     os.makedirs(out_dir, exist_ok=True)
-    launch_ym = app_launch_date[:7]  # 'YYYY-MM'
+    launch_ym = app_launch_date[:7]
     ym = pd.to_datetime(orders["order_date"]).dt.strftime("%Y-%m")
     for month, g in orders.groupby(ym):
         if month < launch_ym:
@@ -332,13 +305,10 @@ def write_orders_by_month(orders, out_dir, app_launch_date):
         write_parquet(g, os.path.join(out_dir, f"orders_{month}.parquet"))
 
 
-# ------------------------------------------------------------------------------
-# Orchestrator
-# ------------------------------------------------------------------------------
+# --- Orchestrator ---
 
 def build_all(cfg):
-    """Sinh cả 7 bảng. Đặt seed ở đây -> chạy lại ra y hệt."""
-    np.random.seed(cfg["random_seed"])
+    np.random.seed(cfg["random_seed"])  # fixed seed -> reproducible
     vol = cfg["volume"]
     start = pd.Timestamp(cfg["history"]["start_date"])
     miss = cfg["offline_issues"]["missing_rate"]
@@ -371,7 +341,6 @@ def write_all(tables, cfg):
 
 
 def run(cfg):
-    """Sinh + ghi + in tóm tắt (dùng cho CLI `python -m src.run offline`)."""
     import time
     t0 = time.time()
     tables = build_all(cfg)
@@ -379,7 +348,7 @@ def run(cfg):
     from src.quality_report import write_offline_report
     report_path = write_offline_report(tables, cfg)
 
-    print(f"[offline] sinh 7 bảng trong {time.time() - t0:.1f}s -> {cfg['paths']['offline_dir']}")
+    print(f"[offline] generated 7 tables in {time.time() - t0:.1f}s -> {cfg['paths']['offline_dir']}")
     for name, df in tables.items():
         print(f"  - {name:12s}: {len(df):>8,} rows")
     print(f"[offline] quality report -> {report_path}")
