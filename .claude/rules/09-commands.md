@@ -1,20 +1,34 @@
 # Rule: Commands (setup / run / test)
 
-> **Trạng thái:** Chưa có code, chưa chốt stack → mục này còn để trống có chủ đích.
-> Khi triển khai Section 01 (chọn stack: Python/DuckDB/PySpark/...), **điền các lệnh thật đã chạy được** vào đây và xóa dòng cảnh báo này. Không liệt kê lệnh phỏng đoán.
+Stack: Python + Polars + DuckDB. Môi trường: **pip + venv** (`.venv/`, pin trong `requirements.txt`).
+
+> Ghi chú: ban đầu định dùng conda nhưng conda không tải nổi repodata trên mạng máy này → chuyển sang pip+venv (cài ~55s).
 
 ## Environment / setup
-<!-- vd: python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt -->
-_(chưa có)_
+
+```bash
+python -m venv .venv
+source .venv/bin/activate            # Linux/macOS
+pip install -r requirements.txt
+```
 
 ## Run
-<!-- vd: lệnh chạy data generator của Section 01, với config + seed -->
-_(chưa có)_
+
+```bash
+python -m src.run --help             # xem các lệnh
+python -m src.run offline            # sinh dữ liệu offline (Parquet) — M1
+python -m src.run stream             # sinh dữ liệu streaming (NDJSON) — M2
+python -m src.run all                # sinh cả hai
+python -m src.run all --config config/generator.yaml
+```
 
 ## Test
-<!-- vd: pytest -q ; chạy một test đơn lẻ: pytest path/to/test_file.py::test_name -->
-_(chưa có)_
+
+```bash
+python -m pytest tests/ -q           # chạy toàn bộ test
+python -m pytest tests/test_smoke.py::test_config_loads_with_seed   # một test đơn lẻ
+```
 
 ## Lint / format
-<!-- vd: ruff check . ; ruff format . -->
-_(chưa có)_
+
+_(chưa thiết lập linter; prettier tự chạy qua hook PostToolUse cho file được sửa)_

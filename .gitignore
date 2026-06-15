@@ -10,6 +10,7 @@ env/
 data/
 *.parquet
 *.avro
+*.ndjson
 *.log
 duckdb/
 *.duckdb

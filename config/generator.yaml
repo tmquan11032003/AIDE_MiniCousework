@@ -1,0 +1,50 @@
+# Cấu hình sinh dữ liệu — chuỗi quán cà phê (Coffee Chain)
+# Mọi tham số đều reproducible qua random_seed. Sửa ở đây, không hardcode trong code.
+
+random_seed: 42
+
+# Khoảng thời gian lịch sử (offline)
+history:
+  start_date: "2025-01-01"
+  days: 180
+  # Mốc ra mắt mobile app -> dùng cho schema evolution:
+  # đơn TRƯỚC ngày này thiếu cột `channel` và `membership_tier`.
+  app_launch_date: "2025-04-01"
+
+# Quy mô dữ liệu (mức Vừa)
+volume:
+  n_stores: 50
+  n_products: 300
+  n_customers: 20000
+  n_employees: 400
+  n_orders: 200000
+  n_stream_events: 500000
+
+# Skew / phân phối lệch
+skew:
+  n_top_stores: 8 # số cửa hàng "đắt khách"
+  top_store_share: 0.75 # % đơn rơi vào nhóm cửa hàng lớn
+  coffee_category_share: 0.70 # % món thuộc category coffee
+  peak_hours: [7, 8, 9] # giờ cao điểm sáng
+  peak_hour_share: 0.55 # % đơn rơi vào giờ cao điểm
+
+# Lỗi/thách thức tầng offline
+offline_issues:
+  duplicate_rate: 0.02 # tỉ lệ order_items bị nhân bản
+  missing_rate: 0.01 # tỉ lệ missing values ở vài cột optional
+
+# Tầng streaming (event real-time)
+streaming:
+  base_events_per_min: 100
+  burst_multiplier: 25 # ×N trong cửa sổ cao điểm
+  burst_windows: ["07:00-09:00", "12:00-13:00"]
+  late_arrival_rate: 0.12 # % event có created_ts trễ hơn event_timestamp
+  late_delay_seconds: [30, 3600] # khoảng trễ [min, max]
+  out_of_order_rate: 0.05 # % event bị đảo thứ tự khi ghi
+  duplicate_rate: 0.015 # % event trùng (cùng event_id)
+
+# Đường dẫn output
+paths:
+  offline_dir: "data/offline"
+  streaming_dir: "data/streaming"
+  reports_dir: "reports"

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git remote:*)",
+      "Bash(git fetch:*)",
+      "Bash(git ls-remote:*)",
+      "Bash(git add:*)",
+      "Bash(git init:*)",
+      "Bash(git config --get:*)",
+      "Bash(gh auth status:*)"
+    ]
+  },
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "notify-send -u normal \"Claude Code cần bạn\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "paplay /usr/share/sounds/freedesktop/stereo/complete.oga 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; npx --yes prettier --write --ignore-unknown \"$f\"; } 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "jq -r '\"Tool: \\(.tool_name) | File: \\(.tool_input.file_path // .tool_response.filePath // \"?\")\"' | { read -r line; echo \"[$(date '+%Y-%m-%d %H:%M:%S')] $line\" >> ~/.claude/change_log.txt; } 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
