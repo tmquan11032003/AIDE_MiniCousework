@@ -43,7 +43,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[run] command={args.command} | seed={cfg['random_seed']} | config={args.config}")
 
     if args.command in ("offline", "all"):
-        print("[run] offline generator: chưa triển khai (sẽ làm ở M1).")
+        from src.generators.offline import run as run_offline
+
+        run_offline(cfg)
     if args.command in ("stream", "all"):
         print("[run] streaming generator: chưa triển khai (sẽ làm ở M2).")
     return 0

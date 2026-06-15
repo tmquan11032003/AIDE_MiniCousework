@@ -1,0 +1,6 @@
+[tool.ruff]
+line-length = 100
+exclude = [".venv", "data", "__pycache__"]
+
+[tool.ruff.lint]
+extend-ignore = ["E203"]
