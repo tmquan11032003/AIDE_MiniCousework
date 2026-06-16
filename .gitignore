@@ -18,6 +18,8 @@ duckdb/
 # Secrets / config local
 .env
 *.local
+# Ngoại lệ: docker/.env chỉ chứa image tag + creds dummy local (không phải secret thật)
+!docker/.env
 
 # OS / editor
 .DS_Store
