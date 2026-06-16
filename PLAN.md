@@ -107,7 +107,7 @@ out-of-order, burst, missing. Chi tiết grain/cột chốt khi vào generator.
 **M1 — Section 01: Offline generator (pandas → Parquet)** ✅ **(XONG)**
 Sinh 7 bảng + chèn challenge offline (skew, cardinality, schema evolution, duplicates). Reproducible.
 
-**M2 — Section 01: Streaming generator (NDJSON) + design 01**
+**M2 — Section 01: Streaming generator (NDJSON) + design 01** ✅ **(XONG)**
 Event generator (event-time vs ingest-time, late/out-of-order/burst/dup). Viết `01_data_generator.md`
 
 - `reports/quality_report.md`.

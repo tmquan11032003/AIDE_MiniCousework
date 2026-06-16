@@ -65,3 +65,66 @@ def write_offline_report(tables, cfg):
     with open(path, "w", encoding="utf-8") as f:
         f.write(offline_report_text(tables, cfg))
     return path
+
+
+def _burst_hours(burst_windows):
+    hours = set()
+    for w in burst_windows:
+        a, b = w.split("-")
+        hours.update(range(int(a[:2]), int(b[:2])))
+    return hours
+
+
+def stream_report_text(events, cfg):
+    """Return the streaming section (Markdown) of the quality report."""
+    st = cfg["streaming"]
+    n = len(events)
+
+    # burst share: events whose hour falls in a burst window
+    burst_h = _burst_hours(st["burst_windows"])
+    burst = events["event_timestamp"].dt.hour.isin(burst_h).mean()
+    # late arrival: ingest delay > 5s
+    delay = (events["created_ts"] - events["event_timestamp"]).dt.total_seconds()
+    late = (delay > 5).mean()
+    # out-of-order: rows whose event_timestamp is below the running max (ingest order)
+    running_max = events["event_timestamp"].cummax()
+    ooo = (events["event_timestamp"] < running_max).mean()
+    # duplicate rate by event_id
+    dup = (n - events["event_id"].nunique()) / n
+    # events without a known customer (anonymous)
+    anon = events["customer_id"].isna().mean()
+
+    rows = [
+        ("Tổng events (gồm dup)", f"{n:,}", "—"),
+        ("Bursty (giờ cao điểm)", f"{burst:.0%}", "cao (×burst_multiplier)"),
+        ("Late arrival (>5s)", f"{late:.0%}", f"~{st['late_arrival_rate']:.0%}"),
+        ("Out-of-order theo created_ts", f"{ooo:.0%}", "có (do late)"),
+        ("Duplicates event_id", f"{dup:.1%}", f"~{st['duplicate_rate']:.1%}"),
+        ("Event ẩn danh (customer NULL)", f"{anon:.0%}", "~40%"),
+    ]
+    lines = [
+        "",
+        "## Streaming (real-time events)",
+        "",
+        "| Chỉ số | Đo được | Mục tiêu |",
+        "| --- | --- | --- |",
+    ]
+    lines += [f"| {k} | {v} | {t} |" for k, v, t in rows]
+    return "\n".join(lines) + "\n"
+
+
+def write_stream_report(events, cfg):
+    """Append/replace the streaming section in quality_report.md (idempotent)."""
+    out_dir = cfg["paths"]["reports_dir"]
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "quality_report.md")
+
+    base = ""
+    if os.path.exists(path):
+        base = open(path, encoding="utf-8").read()
+    # remove any previous streaming section so re-runs stay idempotent
+    base = base.split("\n## Streaming")[0].rstrip() + "\n"
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(base + stream_report_text(events, cfg))
+    return path

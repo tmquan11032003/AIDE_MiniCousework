@@ -47,7 +47,9 @@ def main(argv: list[str] | None = None) -> int:
 
         run_offline(cfg)
     if args.command in ("stream", "all"):
-        print("[run] streaming generator: chưa triển khai (sẽ làm ở M2).")
+        from src.generate_stream import run as run_stream
+
+        run_stream(cfg)
     return 0
 
 
