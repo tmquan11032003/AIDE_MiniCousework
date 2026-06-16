@@ -38,8 +38,19 @@ docker compose --env-file docker/.env -f docker/docker-compose.yml down -v   # x
 ## Ghi chú
 
 - Credentials (`admin`/`password`) chỉ dùng local, không phải secret thật.
-- Image tag để trong `docker/.env`; sau lần pull đầu nên pin theo digest để tái lập.
+- Image đã **pin theo digest** trong `docker/.env` để tái lập.
 - Project được mount vào `/workspace` trong container `spark-iceberg` để Spark đọc `data/`.
+
+### Troubleshooting: `docker pull` bị `read: connection timed out` (IPv6)
+
+Nếu pull image treo/đứt giữa chừng do IPv6 của máy hỏng, tắt IPv6 tạm thời rồi pull lại:
+
+```bash
+sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+docker compose --env-file docker/.env -f docker/docker-compose.yml pull
+# bật lại sau khi xong (tuỳ chọn): đổi =1 thành =0
+```
 
 ## Lưu trữ (volumes)
 

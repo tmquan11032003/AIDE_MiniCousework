@@ -9,10 +9,11 @@
   - M2 streaming generator (`src/generators/stream.py`) — NDJSON events, seed=43, challenge bursty/late/out-of-order/duplicate.
   - Tài liệu [01_data_generator.md](../../docs/01_data_generator.md); quality report (offline+streaming); **16 test pass**.
   - Code style đơn giản: pandas + function thuần, comment tiếng Anh, đánh dấu `# CHALLENGE`.
-- **M3 (đang làm) — hạ tầng lakehouse Docker** (lean: MinIO + Iceberg REST + Spark; Kafka+Flink để M4):
-  - Đã viết `docker/` (compose, .env, README, smoke_test.sh). Chạy lệnh từ thư mục gốc.
-  - Image: **minio + mc đã pull xong**; **spark-iceberg + rest CHƯA pull** — bị chặn do **IPv6 hỏng** (timeout tới CloudFront) và đang dùng **4G dung lượng hạn chế**. Layer 127MB của spark tải tới ~126MB rồi đứt.
-  - **Việc cần làm khi có mạng tốt/không giới hạn:** `docker compose --env-file docker/.env -f docker/docker-compose.yml pull` → `up -d` → `bash docker/smoke_test.sh`. (Cân nhắc tắt IPv6 cho Docker nếu vẫn timeout.)
-  - ⚠️ `docker/docker-compose.yml` hiện **bị hỏng cú pháp** (biến `${SPARK_ICEBERG_I}` cắt cụt + mất khối `depends_on`) — cần sửa trước khi `up`.
+- **M3 — hạ tầng lakehouse Docker ✅ XONG** (lean: MinIO + Iceberg REST + Spark; Kafka+Flink để M4):
+  - `docker/` (compose + .env pin digest + README + smoke_test.sh). 4 service chạy OK.
+  - Smoke test PASS: Spark tạo+ghi+đọc bảng Iceberg `coffee.smoke_test` trên MinIO; **DuckDB đọc lại** đúng dữ liệu.
+  - Volumes bind vào `/home/mq-ubuntu/data/coffee-lakehouse/` (không đổ vào `/`).
+  - Đã fix lỗi pull do **IPv6 hỏng**: `sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1` rồi pull qua IPv4 (xem docker/README troubleshooting).
+  - Tiếp theo: **M4 — Kafka + Flink → Bronze Iceberg**.
 - **Generator lib:** pandas + pyarrow (đã bỏ Polars/mimesis). Style: thủ tục, comment nhiều.
 - Cập nhật file này khi tiến độ thay đổi (generator chạy được, hạ tầng dựng xong, sang milestone mới...).

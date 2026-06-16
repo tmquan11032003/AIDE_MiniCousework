@@ -120,10 +120,10 @@ Event generator (event-time vs ingest-time, late/out-of-order/burst/dup). Viết
 
 - `reports/quality_report.md`.
 
-**M3 — Section 02 (infra): Lakehouse skeleton trên Docker**
-`docker/docker-compose.yml`: MinIO + Iceberg REST Catalog + Kafka(KRaft) + Flink + Spark. Pin image tag,
-healthcheck, heap opts cho 8GB. _Done khi:_ `docker compose up` lên được; smoke test ghi/đọc 1 bảng
-Iceberg nhỏ trên MinIO bằng Spark **và** đọc lại bằng DuckDB.
+**M3 — Section 02 (infra): Lakehouse skeleton trên Docker** ✅ **(XONG)**
+`docker/`: MinIO + mc + Iceberg REST Catalog + Spark (lean; Kafka+Flink thêm ở M4). Image **pin digest**,
+healthcheck, volumes bind vào `/home/mq-ubuntu/data`. Smoke test PASS: Spark ghi/đọc bảng Iceberg trên
+MinIO **và** DuckDB đọc lại. (Fix pull IPv6: tắt IPv6 → IPv4.)
 
 **M4 — Section 02 (streaming): Kafka + Flink → Bronze Iceberg**
 `producer.py` đẩy NDJSON → Kafka; Flink job consume → `bronze/raw_events` (Iceberg) với watermark
