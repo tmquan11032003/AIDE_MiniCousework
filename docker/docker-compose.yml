@@ -1,0 +1,86 @@
+# Local lakehouse skeleton (Section 02 / M3): MinIO + Iceberg REST catalog + Spark.
+# Service names (spark-iceberg, rest, minio) match the spark-defaults baked into the
+# tabulario/spark-iceberg image (catalog `demo` -> http://rest:8181, S3 -> http://minio:9000).
+# Kafka + Flink are added in M4.
+
+name: coffee-lakehouse
+
+services:
+  spark-iceberg:
+    image: ${SPARK_ICEBERG_IMAGE}
+    container_name: spark-iceberg
+    depends_on:
+      rest:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+    volumes:
+      - ../:/workspace # project root (access data/, scripts)
+    ports:
+      - "8888:8888" # Jupyter
+      - "8080:8080" # Spark UI
+    networks: [lakehouse]
+
+  rest:
+    image: ${ICEBERG_REST_IMAGE}
+    container_name: iceberg-rest
+    ports:
+      - "8181:8181"
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - CATALOG_WAREHOUSE=s3://warehouse/
+      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
+      - CATALOG_S3_ENDPOINT=http://minio:9000
+      - CATALOG_S3_PATH__STYLE__ACCESS=true
+    networks: [lakehouse]
+
+  minio:
+    image: ${MINIO_IMAGE}
+    container_name: minio
+    environment:
+      - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
+      - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
+      - MINIO_DOMAIN=minio
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console
+    command: ["server", "/data", "--console-address", ":9001"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      lakehouse:
+        aliases:
+          - warehouse.minio # virtual-hosted-style bucket access
+
+  # One-shot: create the `warehouse` bucket then idle.
+  mc:
+    image: ${MC_IMAGE}
+    container_name: mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+    entrypoint: >
+      /bin/sh -c "
+      until (mc alias set minio http://minio:9000 ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY}) do echo '...waiting for minio...' && sleep 1; done;
+      mc mb --ignore-existing minio/warehouse;
+      mc anonymous set public minio/warehouse;
+      echo 'bucket warehouse ready';
+      tail -f /dev/null
+      "
+    networks: [lakehouse]
+
+networks:
+  lakehouse:
