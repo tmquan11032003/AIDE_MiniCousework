@@ -4,9 +4,9 @@ Tài liệu thiết kế cho bộ sinh dữ liệu (offline + streaming) của h
 **chuỗi quán cà phê** kiểu Starbucks. Mục tiêu: tạo nguồn dữ liệu **tái lập được** (reproducible) và
 **có chủ đích chèn các thách thức dữ liệu thực tế** để downstream (Section 02 trở đi) phải xử lý.
 
-- Code: [src/generate_offline.py](src/generate_offline.py) (batch), [src/generate_stream.py](src/generate_stream.py) (streaming).
-- Cấu hình: [config/generator.yaml](config/generator.yaml) (mọi tham số + `random_seed`).
-- Bằng chứng: [reports/quality_report.md](reports/quality_report.md) (sinh tự động).
+- Code: [../src/generators/offline.py](../src/generators/offline.py) (batch), [../src/generators/stream.py](../src/generators/stream.py) (streaming).
+- Cấu hình: [../config/generator.yaml](../config/generator.yaml) (mọi tham số + `random_seed`).
+- Bằng chứng: [../reports/quality_report.md](../reports/quality_report.md) (sinh tự động).
 
 ## 1. Tổng quan domain
 
@@ -71,7 +71,7 @@ id (store/customer/product/order) dùng **cùng id scheme** với offline để 
 
 ## 4. Cấu hình & tái lập (reproducibility)
 
-Mọi tham số nằm trong [config/generator.yaml](config/generator.yaml): quy mô (`volume`), tỉ lệ skew,
+Mọi tham số nằm trong [../config/generator.yaml](../config/generator.yaml): quy mô (`volume`), tỉ lệ skew,
 tỉ lệ lỗi (`offline_issues`, `streaming`), mốc thời gian, và quan trọng nhất là `random_seed: 42`.
 
 - Offline dùng seed `42`; streaming dùng seed `43` (để hai luồng độc lập) — cả hai cố định.
@@ -93,7 +93,7 @@ pytest tests/ -q            # 16 test (determinism, schema, tỉ lệ challenge)
 ```
 
 Output: `data/offline/*.parquet` (orders là thư mục nhiều file theo tháng), `data/streaming/events.ndjson`,
-và [reports/quality_report.md](reports/quality_report.md).
+và [../reports/quality_report.md](../reports/quality_report.md).
 
 ## 6. Bằng chứng (Quality Report)
 

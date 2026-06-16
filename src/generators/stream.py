@@ -146,7 +146,7 @@ def run(cfg):
     path = os.path.join(cfg["paths"]["streaming_dir"], "events.ndjson")
     write_ndjson(events, path)
 
-    from src.quality_report import write_stream_report
+    from src.utils.quality import write_stream_report
     report_path = write_stream_report(events, cfg)
 
     print(f"[stream] generated {len(events):,} events in {time.time() - t0:.1f}s -> {path}")

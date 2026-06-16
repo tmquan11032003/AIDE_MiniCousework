@@ -345,7 +345,7 @@ def run(cfg):
     t0 = time.time()
     tables = build_all(cfg)
     write_all(tables, cfg)
-    from src.quality_report import write_offline_report
+    from src.utils.quality import write_offline_report
     report_path = write_offline_report(tables, cfg)
 
     print(f"[offline] generated 7 tables in {time.time() - t0:.1f}s -> {cfg['paths']['offline_dir']}")

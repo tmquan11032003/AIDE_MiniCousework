@@ -72,21 +72,22 @@ sau đó chạy Spark batch (Silver/Gold). Kafka KRaft (no ZooKeeper). Trino coo
 
 ```
 AIDE_Minicoursework/
-├── requirements.txt                  # Python env (pip+venv): pandas, pyarrow, duckdb...
-├── docker/
-│   ├── docker-compose.yml            # MinIO + Iceberg REST + Kafka(KRaft) + Flink + Spark (+ Trino)
-│   ├── .env                          # pin image tags + cấu hình RAM (heap opts)
-│   └── conf/                         # cấu hình từng service (trino catalog, flink, spark-defaults)
-├── config/generator.yaml             # seed + tham số sinh + tỉ lệ lỗi (đã có)
+├── README.md
+├── requirements.txt  pyproject.toml  setup.cfg   # Python env (pip+venv) + lint
+├── config/generator.yaml             # seed + tham số sinh + tỉ lệ lỗi
+├── docs/
+│   ├── PLAN.md  01_data_generator.md  02_schema_design.md
+│   └── reference/                     # đề bài + sample_design (ví dụ)
 ├── src/
-│   ├── generate_offline.py           # pandas generator (Section 01) — function thuần
-│   ├── streaming/producer.py         # đọc NDJSON → publish Kafka
-│   ├── flink/                        # Flink jobs: bronze ingest, windowing
-│   ├── spark/                        # Spark jobs: bronze(batch), silver, gold, features
-│   ├── serving/                      # DuckDB/Trino query scripts
-│   └── run.py                        # CLI (đã có)
-├── data/ (offline Parquet, streaming NDJSON — gitignored)
-├── reports/  · 01_data_generator.md · 02_schema_design.md · tests/
+│   ├── generators/  offline.py  stream.py   # pandas generator (Section 01)
+│   ├── pipelines/                    # Spark bronze/silver/gold (Section 02)
+│   ├── streaming/  producer.py       # Kafka producer (M4)
+│   ├── utils/  config.py  quality.py
+│   └── run.py                        # CLI
+├── docker/                           # compose lakehouse (M3): MinIO+Iceberg+Kafka+Flink+Spark
+├── tests/
+├── data/                             # offline Parquet, streaming NDJSON (gitignored)
+└── reports/                          # quality_report.md (evidence)
 ```
 
 ## Mô hình dữ liệu (Section 01 — giữ nguyên)

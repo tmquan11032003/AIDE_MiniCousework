@@ -4,7 +4,7 @@ import copy
 
 import pytest
 
-from src.generate_stream import build_all
+from src.generators.stream import build_all
 from src.utils.config import load_config
 
 
@@ -58,6 +58,6 @@ def test_out_of_order_exists(events):
 
 def test_bursty(events, small_config):
     """Phần lớn event rơi vào giờ cao điểm (bursty)."""
-    from src.quality_report import _burst_hours
+    from src.utils.quality import _burst_hours
     burst_h = _burst_hours(small_config["streaming"]["burst_windows"])
     assert events["event_timestamp"].dt.hour.isin(burst_h).mean() > 0.5

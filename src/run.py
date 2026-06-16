@@ -43,11 +43,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[run] command={args.command} | seed={cfg['random_seed']} | config={args.config}")
 
     if args.command in ("offline", "all"):
-        from src.generate_offline import run as run_offline
+        from src.generators.offline import run as run_offline
 
         run_offline(cfg)
     if args.command in ("stream", "all"):
-        from src.generate_stream import run as run_stream
+        from src.generators.stream import run as run_stream
 
         run_stream(cfg)
     return 0

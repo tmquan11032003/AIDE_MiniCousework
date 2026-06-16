@@ -4,7 +4,7 @@ import copy
 
 import pytest
 
-from src.generate_offline import build_all
+from src.generators.offline import build_all
 from src.utils.config import load_config
 
 ENTITIES = ["stores", "products", "customers", "employees",
