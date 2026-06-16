@@ -1,7 +1,7 @@
 # Rule: Trạng thái hiện tại
 
 - **Domain đã chốt:** chuỗi quán cà phê (coffee shop chain, kiểu Starbucks) — nhiều cửa hàng, mobile order, loyalty, giờ cao điểm.
-- **Kiến trúc đã chốt:** lakehouse local trên Docker — **Kafka + Flink (stream) + Spark (batch) + MinIO + Apache Iceberg** (+ Trino optional). Generator **pandas** + **DuckDB** (dev/serving). Xem [PLAN.md](../../docs/PLAN.md) (có sơ đồ dòng data + milestone M0–M9).
+- **Kiến trúc đã chốt:** lakehouse local trên Docker — **Kafka + Flink (stream) + Spark (batch) + MinIO + Apache Iceberg** (+ Trino optional). Generator **pandas** + **DuckDB** (dev/serving). Bổ sung Section 02: **Airflow** (orchestration), **Feast** (feature store), **DataHub** (catalog/lineage — chạy tách phiên, profile riêng, giữ Docker 8GB). Xem [PLAN.md](../../docs/PLAN.md) (sơ đồ + milestone M0–M12; M7=Airflow, M8=Feast, M9=DataHub).
 - **Môi trường:** pip + venv (`.venv/`, pin trong `requirements.txt`). _Conda không tải nổi repodata trên mạng máy này → pip+venv._
 - **Ngôn ngữ tài liệu:** tiếng Việt.
 - **Phase:** mini-coursework. **M0 + M1 + M2 xong** (Section 01 hoàn tất):

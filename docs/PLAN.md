@@ -9,23 +9,27 @@ Starbucks**. Mục tiêu học: dựng một **lakehouse end-to-end** sát produ
 
 **Thay đổi scope:** nâng từ stack nhẹ (Polars+DuckDB thuần) lên **lakehouse trên Docker**:
 **Kafka + Flink + Spark + MinIO + Apache Iceberg** (+ Trino optional). Generator dùng **pandas** (đơn
-giản, dễ học) + **DuckDB** (dev/test/serving nhanh).
+giản, dễ học) + **DuckDB** (dev/test/serving nhanh). Bổ sung 3 lớp để full end-to-end + đủ Section 02:
+**Airflow** (orchestration), **Feast** (feature store), **DataHub** (catalog/lineage).
 
 **Ràng buộc thực tế:** máy 8GB RAM cho Docker + mạng chậm (kéo image lâu) → **phân pha**, không bật tất cả
 cùng lúc, pin image tag để tái lập.
 
 ## Quyết định đã chốt
 
-| Hạng mục            | Chốt                                             | Ghi chú                                                    |
-| ------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
-| Lộ trình            | **Phân pha** (core trước, mở rộng dần)           | Tránh quá tải 8GB                                          |
-| Stream engine chính | **Apache Flink**                                 | Học event-time windowing thật                              |
-| Table format        | **Apache Iceberg** + REST Catalog                | Mượt nhất với Flink/Spark/Trino (Delta + Flink kém mature) |
-| Batch engine        | **Spark** (local mode)                           | Silver/Gold ETL                                            |
-| Object storage      | **MinIO** (S3-compatible)                        | Lưu mọi layer                                              |
-| Serving/query       | **DuckDB** (dev) + **Trino** (optional, Phase C) | DuckDB đọc thẳng Iceberg/Parquet trên MinIO                |
-| Generator           | **pandas + pyarrow** (function thuần, comment)   | Người mới học — dễ đọc/trình bày hơn class+Polars          |
-| Môi trường Python   | **pip + venv** (`requirements.txt`)              | Conda quá chậm trên mạng máy này                           |
+| Hạng mục            | Chốt                                             | Ghi chú                                                           |
+| ------------------- | ------------------------------------------------ | ----------------------------------------------------------------- |
+| Lộ trình            | **Phân pha** (core trước, mở rộng dần)           | Tránh quá tải 8GB                                                 |
+| Stream engine chính | **Apache Flink**                                 | Học event-time windowing thật                                     |
+| Table format        | **Apache Iceberg** + REST Catalog                | Mượt nhất với Flink/Spark/Trino (Delta + Flink kém mature)        |
+| Batch engine        | **Spark** (local mode)                           | Silver/Gold ETL                                                   |
+| Object storage      | **MinIO** (S3-compatible)                        | Lưu mọi layer                                                     |
+| Serving/query       | **DuckDB** (dev) + **Trino** (optional, Phase C) | DuckDB đọc thẳng Iceberg/Parquet trên MinIO                       |
+| Generator           | **pandas + pyarrow** (function thuần, comment)   | Người mới học — dễ đọc/trình bày hơn class+Polars                 |
+| Môi trường Python   | **pip + venv** (`requirements.txt`)              | Conda quá chậm trên mạng máy này                                  |
+| Orchestration       | **Airflow** LocalExecutor + Postgres             | ~2GB, bật thường trực; điều phối Spark/Flink + Feast              |
+| Feature store       | **Feast** (offline feat\_\*, online SQLite)      | ~0 RAM; `get_historical_features` point-in-time (ASOF)            |
+| Catalog/lineage     | **DataHub** — compose profile riêng (toggle)     | Nặng ~8GB → bật tách phiên, tắt Spark/Flink trước; giữ Docker 8GB |
 
 ## 🔄 Sơ đồ dòng data hoàn chỉnh (end-to-end)
 
@@ -84,7 +88,10 @@ AIDE_Minicoursework/
 │   ├── streaming/  producer.py       # Kafka producer (M4)
 │   ├── utils/  config.py  quality.py
 │   └── run.py                        # CLI
-├── docker/                           # compose lakehouse (M3): MinIO+Iceberg+Kafka+Flink+Spark
+├── docker/                           # compose lakehouse + profiles (core/stream/orchestration/datahub)
+├── airflow/  dags/  Dockerfile       # orchestration (M7) — DAG điều phối Spark/Flink/Feast
+├── feast/  feature_repo/             # feature store (M8) — offline feat_*, online SQLite
+├── datahub/  recipes/                # catalog/lineage (M9) — ingest Iceberg (profile riêng)
 ├── tests/
 ├── data/                             # offline Parquet, streaming NDJSON (gitignored)
 └── reports/                          # quality_report.md (evidence)
@@ -130,22 +137,35 @@ Spark batch: load reference Parquet → Bronze `raw_*`; Bronze → Silver (`stg_
 
 **M6 — Section 02 (serving + evidence): DuckDB (+Trino optional)**
 Query Gold bằng DuckDB; (optional) bật Trino coordinator-only cho serving/BI + demo point-in-time.
-DQ checks + run metadata + lineage/evidence. **Kết thúc mini-phase.**
+DQ checks + run metadata.
+
+**M7 — Section 02 (orchestration): Airflow** (`airflow/`, LocalExecutor + Postgres)
+DAG điều phối: generator → Spark Bronze→Silver→Gold (SparkSubmitOperator) + submit/monitor Flink
+(BashOperator → Flink REST) + trigger Feast materialize. _Done:_ DAG chạy, job Spark thành công, Gold cập nhật.
+
+**M8 — Section 02 (feature store): Feast** (`feast/feature_repo/`)
+Offline đọc `feat_*` (Parquet/Iceberg trên MinIO), online SQLite, registry file. `get_historical_features`
+point-in-time; `materialize` qua Airflow. _Done:_ training df point-in-time đúng (feature_ts ≤ label_ts).
+
+**M9 — Section 02 (lineage): DataHub** (`datahub/`, compose profile riêng — toggle)
+Bật DataHub (tắt Spark/Flink trước), ingest Iceberg recipe (+Spark/Airflow lineage nếu kịp) → UI hiện
+catalog + lineage graph; screenshot evidence; tắt. **Kết thúc Section 02 / mini-phase.**
 
 ### Final phase (sau)
 
-**M7 — Flink nâng cao (Phase B):** event-time windowing thật (doanh thu real-time theo store), stateful
+**M10 — Flink nâng cao (Phase B):** event-time windowing thật (doanh thu real-time theo store), stateful
 join order↔payment, streaming feature → `feat_*`.
-**M8 — Section 03:** generator drift + `ml_customer_label`/`..._training` + drift report (PSI) + monitoring.
-**M9 — Section 04:** chọn 1 AI track (ML hoặc LLM). Trino federated demo (Phase C) nếu còn tài nguyên.
+**M11 — Section 03:** generator drift + `ml_customer_label`/`..._training` + drift report (PSI) + monitoring.
+**M12 — Section 04:** chọn 1 AI track (ML hoặc LLM). Trino federated demo (Phase C) nếu còn tài nguyên.
 
 ---
 
 ## Ngân sách RAM (ước tính, single-node)
 
 MinIO ~256MB · Kafka KRaft ~512MB · Iceberg REST ~256MB · Flink (JM+1 TM) ~1.5GB · Spark local ~1.5GB
-· Trino coord ~1.5GB. **Không chạy Spark+Flink+Trino cùng lúc.** Core (MinIO+Kafka+REST+Flink) ≈ 2.5GB;
-thêm Spark (tắt Flink) ≈ 2.3GB → vừa 8GB.
+· Trino coord ~1.5GB · Airflow (web+sched+PG) ~2GB · Feast ~0 (lib) · **DataHub ~8GB (14 container)**.
+**Không chạy Spark+Flink+Trino cùng lúc.** Core+Airflow ≈ 4-5GB (vừa 8GB). **DataHub chạy tách phiên** —
+bật riêng (tắt Spark/Flink), ingest lineage xong thì tắt. Dùng `docker compose --profile <p> up` để bật-tắt.
 
 ## Verification
 
