@@ -47,6 +47,8 @@ services:
       - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
       - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
       - MINIO_DOMAIN=minio
+    volumes:
+      - ${HOST_DATA_DIR}/minio:/data # persist on /home (not /)
     ports:
       - "9000:9000" # S3 API
       - "9001:9001" # web console

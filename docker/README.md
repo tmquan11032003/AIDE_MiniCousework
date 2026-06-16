@@ -40,3 +40,18 @@ docker compose --env-file docker/.env -f docker/docker-compose.yml down -v   # x
 - Credentials (`admin`/`password`) chỉ dùng local, không phải secret thật.
 - Image tag để trong `docker/.env`; sau lần pull đầu nên pin theo digest để tái lập.
 - Project được mount vào `/workspace` trong container `spark-iceberg` để Spark đọc `data/`.
+
+## Lưu trữ (volumes)
+
+Dữ liệu bền của container lưu ở **`${HOST_DATA_DIR}`** (mặc định `/home/mq-ubuntu/data/coffee-lakehouse`,
+trên partition `/home` rộng — KHÔNG đổ vào `/`). Đổi đường dẫn này trong `docker/.env` nếu cần.
+
+```
+/home/mq-ubuntu/data/coffee-lakehouse/
+├── minio/   # MinIO object storage (Parquet/Iceberg của mọi layer)
+├── kafka/   # (M4) Kafka logs
+└── flink/   # (M4) Flink checkpoints/state
+```
+
+`down` giữ nguyên thư mục này; `down -v` chỉ xoá named volume của Docker, KHÔNG xoá bind mount —
+muốn xoá sạch data thì xoá thủ công thư mục trên.
