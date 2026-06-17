@@ -24,6 +24,7 @@
   - DQ tất cả PASS; demo schema evolution + Iceberg time-travel (TIMESTAMP AS OF) + point-in-time feature.
   - Tài liệu [02_schema_design.md](../../docs/02_schema_design.md) + [evidence](../../reports/section_02_evidence.md).
   - Lưu ý: metadata table Iceberg (`.snapshots`) qua REST catalog kén cú pháp trong Spark → time-travel demo dùng TIMESTAMP AS OF thay vì snapshot-id.
-  - **Section 02 core (M3-M5) xong.** Tiếp theo: **M6 serving** rồi **M7 Airflow / M8 Feast / M9 DataHub**.
+- **M6 — serving (DuckDB) ✅ XONG:** `src/serving/duckdb_serving.py` đọc Gold trên MinIO — BI queries (revenue theo region/store, channel mix) + point-in-time feature lookup. Trino để optional. Evidence cập nhật.
+  - **Section 02 core (M3–M6) XONG = nền data lakehouse hoàn chỉnh (batch + streaming).** Tiếp theo: **M7 Airflow → M8 Feast → M9 DataHub** (orchestration + feature store + lineage).
 - **Generator lib:** pandas + pyarrow (đã bỏ Polars/mimesis). Style: thủ tục, comment nhiều.
 - Cập nhật file này khi tiến độ thay đổi (generator chạy được, hạ tầng dựng xong, sang milestone mới...).

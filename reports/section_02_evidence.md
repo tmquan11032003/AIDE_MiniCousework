@@ -54,3 +54,28 @@ C008678  orders90d=14 aov=320.7 cats=4
 C018666  orders90d=13 aov=199.2 cats=2
 C017653  orders90d=13 aov=335.6 cats=4
 ```
+
+## Serving — DuckDB query trên Gold (M6)
+
+`src/serving/duckdb_serving.py` đọc Gold (Iceberg/Parquet trên MinIO) qua httpfs.
+
+**Doanh thu theo region** (skew: miền Nam áp đảo):
+
+```
+South   130,232 orders  revenue 35,658,958
+North    28,398 orders  revenue  7,751,358
+Central  27,472 orders  revenue  7,515,646
+```
+
+**Channel mix** (NULL = đơn trước khi ra app — schema evolution chảy tới serving):
+
+```
+(pre-app) 100,293 | in_store 54,670 | mobile_app 25,103 | drive_thru 11,966 | delivery 7,968
+```
+
+**Point-in-time feature lookup** (as of label_time = 2025-09-01): feature snapshot 2025-06-29 ≤ label →
+hợp lệ, không rò rỉ tương lai.
+
+```
+C008678  2025-06-29  orders_90d=14  aov_90d=320.7
+```

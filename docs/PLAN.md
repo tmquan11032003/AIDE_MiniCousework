@@ -140,9 +140,10 @@ DQ tất cả PASS (uniqueness/referential/null/reconciliation khớp 54,734,865
 
 - [evidence](../reports/section_02_evidence.md).
 
-**M6 — Section 02 (serving + evidence): DuckDB (+Trino optional)**
-Query Gold bằng DuckDB; (optional) bật Trino coordinator-only cho serving/BI + demo point-in-time.
-DQ checks + run metadata.
+**M6 — Section 02 (serving + evidence): DuckDB** ✅ **(XONG)**
+`src/serving/duckdb_serving.py`: DuckDB đọc Gold (Iceberg/Parquet trên MinIO) — BI queries (doanh thu
+theo region/store, channel mix) + **point-in-time feature lookup**. Evidence: [reports/section_02_evidence.md](../reports/section_02_evidence.md).
+Trino để optional (DuckDB đã đủ serving). **Kết thúc Section 02 core / mini-phase data.**
 
 **M7 — Section 02 (orchestration): Airflow** (`airflow/`, LocalExecutor + Postgres)
 DAG điều phối: generator → Spark Bronze→Silver→Gold (SparkSubmitOperator) + submit/monitor Flink
