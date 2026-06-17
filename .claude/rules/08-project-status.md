@@ -19,6 +19,11 @@
   - Flink image build (`docker/flink/`, Flink 1.19 + Iceberg 1.6.1 + Kafka + flink-shaded-hadoop). Job `src/flink/bronze_ingest.sql`: Kafka → `bronze.raw_events` (append-only, watermark event-time).
   - **Bronze append-only (raw); dedup để dành Silver (M5).** Verify: 507,500 events exactly-once, 7,500 dup giữ nguyên, 3 mốc thời gian; Spark+DuckDB đọc lại được.
   - Lưu ý lỗi đã gặp: Flink+Iceberg cần Hadoop jar (`flink-shaded-hadoop-2-uber`) nếu không sẽ `ClassNotFoundException: hadoop.conf.Configuration`.
-  - Tiếp theo: **M5 — Spark Silver/Gold + design 02** (Silver dedup Bronze + reference Parquet → Bronze; Bronze→Silver→Gold).
+- **M5 — Spark Silver/Gold + design 02 ✅ XONG:**
+  - `src/spark/`: bronze_load.py (7 Parquet→Bronze, orders mergeSchema), silver.py (dedup order_items/events + clean), gold.py (5 dim + fact_orders/fact_order_items + obt_order_performance + feat_customer_90d), dq_checks.py.
+  - DQ tất cả PASS; demo schema evolution + Iceberg time-travel (TIMESTAMP AS OF) + point-in-time feature.
+  - Tài liệu [02_schema_design.md](../../docs/02_schema_design.md) + [evidence](../../reports/section_02_evidence.md).
+  - Lưu ý: metadata table Iceberg (`.snapshots`) qua REST catalog kén cú pháp trong Spark → time-travel demo dùng TIMESTAMP AS OF thay vì snapshot-id.
+  - **Section 02 core (M3-M5) xong.** Tiếp theo: **M6 serving** rồi **M7 Airflow / M8 Feast / M9 DataHub**.
 - **Generator lib:** pandas + pyarrow (đã bỏ Polars/mimesis). Style: thủ tục, comment nhiều.
 - Cập nhật file này khi tiến độ thay đổi (generator chạy được, hạ tầng dựng xong, sang milestone mới...).

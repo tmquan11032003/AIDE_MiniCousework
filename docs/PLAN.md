@@ -132,10 +132,13 @@ watermark event-time. **Bronze append-only (raw, giữ dup); dedup chuyển sang
 Đã verify: 507,500 events → Bronze (exactly-once), 7,500 dup (1.5%) giữ nguyên; 3 mốc thời gian
 (event_timestamp / created_ts / ingest_ts); Spark + DuckDB đọc lại được (cross-engine).
 
-**M5 — Section 02 (batch): Spark Silver/Gold + design 02**
-Spark batch: load reference Parquet → Bronze `raw_*`; Bronze → Silver (`stg_*`: dedup, clean) → Gold
-(`dim_/fact_/obt_/feat_`). Demo **Iceberg schema evolution + time-travel**; point-in-time. Viết
-`02_schema_design.md` (data contract, SLA, DQ checks, naming).
+**M5 — Section 02 (batch): Spark Silver/Gold + design 02** ✅ **(XONG)**
+Spark jobs (`src/spark/`): `bronze_load.py` (7 Parquet → Bronze, orders mergeSchema) → `silver.py`
+(dedup order_items/events + clean) → `gold.py` (5 dim + 2 fact + OBT + feat_customer_90d) → `dq_checks.py`.
+DQ tất cả PASS (uniqueness/referential/null/reconciliation khớp 54,734,865). Demo: schema evolution,
+**Iceberg time-travel** (TIMESTAMP AS OF 50→55), point-in-time feature. Viết [02_schema_design.md](02_schema_design.md)
+
+- [evidence](../reports/section_02_evidence.md).
 
 **M6 — Section 02 (serving + evidence): DuckDB (+Trino optional)**
 Query Gold bằng DuckDB; (optional) bật Trino coordinator-only cho serving/BI + demo point-in-time.
