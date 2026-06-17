@@ -2,9 +2,13 @@
 __pycache__/
 *.py[cod]
 .venv/
+.venv-feast/
 venv/
 env/
 .ipynb_checkpoints/
+
+# Feast local stores (regenerable)
+feast/feature_repo/data/*.db
 
 # Data outputs / generated artifacts (giữ code generator, không commit dữ liệu sinh ra)
 data/

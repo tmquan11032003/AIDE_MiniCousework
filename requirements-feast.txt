@@ -1,0 +1,3 @@
+# Feast cài trong venv RIÊNG (.venv-feast) để tránh xung đột deps với generator env.
+#   python -m venv .venv-feast && .venv-feast/bin/pip install -r requirements-feast.txt
+feast==0.64.0

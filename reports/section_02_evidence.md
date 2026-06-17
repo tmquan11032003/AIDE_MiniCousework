@@ -95,3 +95,21 @@ dq_checks    success   (phụ thuộc gold)
 
 Sau khi DAG chạy: `gold.fact_orders` = 200,000, `gold.feat_customer_90d` = 19,409 (Gold được dựng lại bởi pipeline).
 Airflow UI: http://localhost:8082 (admin/admin).
+
+## Feature store — Feast (M8)
+
+`feast/feature_repo/` (offline = Parquet export từ Gold `feat_customer_90d`, online = SQLite). 19,409 feature rows.
+
+**Point-in-time** (`get_historical_features`): label trước feature snapshot 2025-06-29 bị loại → no leakage.
+
+```
+entity_df rows in = 3 | rows out = 2  (label 2025-05-01 bị loại)
+C008678  2025-09-01  orders_90d=14  aov=320.7  cats=4
+C018666  2025-09-01  orders_90d=13  aov=199.2  cats=2
+```
+
+**Online serving** (`get_online_features` sau `materialize`):
+
+```
+C008678 -> {f_total_orders_90d: 14, f_avg_order_value_90d: 320.7, f_distinct_categories_90d: 4}
+```

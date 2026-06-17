@@ -150,9 +150,10 @@ DAG `batch_pipeline` điều phối Spark `bronze_load → silver → gold → d
 (Airflow image có docker CLI + mount host socket, `group_add: 984`). _Done:_ DAG trigger → tất cả task
 **success** tuần tự, Gold dựng lại (fact_orders 200k). Compose profiles core/stream/orchestration để bật-tắt RAM.
 
-**M8 — Section 02 (feature store): Feast** (`feast/feature_repo/`)
-Offline đọc `feat_*` (Parquet/Iceberg trên MinIO), online SQLite, registry file. `get_historical_features`
-point-in-time; `materialize` qua Airflow. _Done:_ training df point-in-time đúng (feature_ts ≤ label_ts).
+**M8 — Section 02 (feature store): Feast** ✅ **(XONG)** (`feast/feature_repo/`, venv riêng `.venv-feast`)
+Offline = Parquet export từ Gold `feat_customer_90d` (`src/serving/export_features.py`), online = SQLite.
+`feast apply` + `get_historical_features` **point-in-time** (label trước feature snapshot bị loại → no
+leakage) + `materialize` → `get_online_features` serving. _Done:_ 3 vào → 2 ra point-in-time; online trả 14 orders.
 
 **M9 — Section 02 (lineage): DataHub** (`datahub/`, compose profile riêng — toggle)
 Bật DataHub (tắt Spark/Flink trước), ingest Iceberg recipe (+Spark/Airflow lineage nếu kịp) → UI hiện
