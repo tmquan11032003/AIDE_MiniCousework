@@ -125,10 +125,12 @@ Event generator (event-time vs ingest-time, late/out-of-order/burst/dup). Viết
 healthcheck, volumes bind vào `/home/mq-ubuntu/data`. Smoke test PASS: Spark ghi/đọc bảng Iceberg trên
 MinIO **và** DuckDB đọc lại. (Fix pull IPv6: tắt IPv6 → IPv4.)
 
-**M4 — Section 02 (streaming): Kafka + Flink → Bronze Iceberg**
-`producer.py` đẩy NDJSON → Kafka; Flink job consume → `bronze/raw_events` (Iceberg) với watermark
-event-time, dedup `event_id`, xử lý late arrival. _Done khi:_ event chảy tới Bronze, query đếm được bằng
-DuckDB; chứng minh event-time vs ingest-time.
+**M4 — Section 02 (streaming): Kafka + Flink → Bronze Iceberg** ✅ **(XONG)**
+`src/streaming/producer.py` (confluent_kafka) đẩy NDJSON → Kafka; Flink SQL job
+(`src/flink/bronze_ingest.sql`, image `docker/flink/`) consume → `bronze.raw_events` (Iceberg) với
+watermark event-time. **Bronze append-only (raw, giữ dup); dedup chuyển sang Silver (M5)** — đúng medallion.
+Đã verify: 507,500 events → Bronze (exactly-once), 7,500 dup (1.5%) giữ nguyên; 3 mốc thời gian
+(event_timestamp / created_ts / ingest_ts); Spark + DuckDB đọc lại được (cross-engine).
 
 **M5 — Section 02 (batch): Spark Silver/Gold + design 02**
 Spark batch: load reference Parquet → Bronze `raw_*`; Bronze → Silver (`stg_*`: dedup, clean) → Gold

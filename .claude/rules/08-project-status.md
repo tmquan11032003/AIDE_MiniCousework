@@ -14,6 +14,11 @@
   - Smoke test PASS: Spark tạo+ghi+đọc bảng Iceberg `coffee.smoke_test` trên MinIO; **DuckDB đọc lại** đúng dữ liệu.
   - Volumes bind vào `/home/mq-ubuntu/data/coffee-lakehouse/` (không đổ vào `/`).
   - Đã fix lỗi pull do **IPv6 hỏng**: `sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1` rồi pull qua IPv4 (xem docker/README troubleshooting).
-  - Tiếp theo: **M4 — Kafka + Flink → Bronze Iceberg**.
+- **M4 — Kafka + Flink → Bronze Iceberg ✅ XONG:**
+  - Kafka (KRaft) + `src/streaming/producer.py` (confluent_kafka) đẩy NDJSON → topic `coffee.events`.
+  - Flink image build (`docker/flink/`, Flink 1.19 + Iceberg 1.6.1 + Kafka + flink-shaded-hadoop). Job `src/flink/bronze_ingest.sql`: Kafka → `bronze.raw_events` (append-only, watermark event-time).
+  - **Bronze append-only (raw); dedup để dành Silver (M5).** Verify: 507,500 events exactly-once, 7,500 dup giữ nguyên, 3 mốc thời gian; Spark+DuckDB đọc lại được.
+  - Lưu ý lỗi đã gặp: Flink+Iceberg cần Hadoop jar (`flink-shaded-hadoop-2-uber`) nếu không sẽ `ClassNotFoundException: hadoop.conf.Configuration`.
+  - Tiếp theo: **M5 — Spark Silver/Gold + design 02** (Silver dedup Bronze + reference Parquet → Bronze; Bronze→Silver→Gold).
 - **Generator lib:** pandas + pyarrow (đã bỏ Polars/mimesis). Style: thủ tục, comment nhiều.
 - Cập nhật file này khi tiến độ thay đổi (generator chạy được, hạ tầng dựng xong, sang milestone mới...).

@@ -1,14 +1,16 @@
 # Lakehouse hạ tầng (Docker) — Section 02
 
-Stack local cho lakehouse. **M3 (hiện tại):** MinIO + Iceberg REST catalog + Spark.
-**M4 (sau):** thêm Kafka + Flink cho streaming.
+Stack local cho lakehouse. **M3:** MinIO + Iceberg REST catalog + Spark. **M4:** thêm Kafka + Flink (streaming).
 
-| Service         | Vai trò                           | Cổng                            |
-| --------------- | --------------------------------- | ------------------------------- |
-| `minio`         | Object storage S3 (lưu mọi layer) | 9000 (API), 9001 (console)      |
-| `mc`            | Khởi tạo bucket `warehouse`       | —                               |
-| `rest`          | Iceberg REST catalog (metadata)   | 8181                            |
-| `spark-iceberg` | Spark + Iceberg (batch ETL)       | 8080 (Spark UI), 8888 (Jupyter) |
+| Service             | Vai trò                           | Cổng                            |
+| ------------------- | --------------------------------- | ------------------------------- |
+| `minio`             | Object storage S3 (lưu mọi layer) | 9000 (API), 9001 (console)      |
+| `mc`                | Khởi tạo bucket `warehouse`       | —                               |
+| `rest`              | Iceberg REST catalog (metadata)   | 8181                            |
+| `spark-iceberg`     | Spark + Iceberg (batch ETL)       | 8080 (Spark UI), 8888 (Jupyter) |
+| `kafka`             | Message broker (KRaft, no ZK)     | 29092 (host), 9092 (in-net)     |
+| `flink-jobmanager`  | Flink JM (stream engine)          | 8081 (web UI)                   |
+| `flink-taskmanager` | Flink TM (worker)                 | —                               |
 
 Service names (`spark-iceberg`, `rest`, `minio`) khớp với `spark-defaults` có sẵn trong image
 `tabulario/spark-iceberg` (catalog `demo` → `http://rest:8181`, S3 → `http://minio:9000`).
@@ -34,6 +36,32 @@ docker compose --env-file docker/.env -f docker/docker-compose.yml down -v   # x
 
 # MinIO console: http://localhost:9001  (user/pass trong docker/.env)
 ```
+
+## M4 — Streaming: Kafka + Flink → Bronze Iceberg
+
+```bash
+# (lần đầu) build image Flink có sẵn jar Iceberg/Kafka/S3/Hadoop
+docker compose --env-file docker/.env -f docker/docker-compose.yml build flink-jobmanager
+
+# bật cả stack (core + kafka + flink)
+docker compose --env-file docker/.env -f docker/docker-compose.yml up -d
+
+# tạo topic
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 \
+  --create --if-not-exists --topic coffee.events --partitions 3 --replication-factor 1
+
+# submit Flink SQL job (Kafka -> bronze.raw_events, append-only, event-time watermark)
+docker cp src/flink/bronze_ingest.sql flink-jobmanager:/tmp/bronze_ingest.sql
+docker exec flink-jobmanager /opt/flink/bin/sql-client.sh -f /tmp/bronze_ingest.sql
+
+# đẩy events từ NDJSON vào Kafka (producer)
+python -m src.streaming.producer            # toàn bộ; hoặc --limit N / --rate R
+
+# đếm Bronze (đọc đúng bảng Iceberg)
+docker exec spark-iceberg spark-sql -e "SELECT count(*) FROM demo.bronze.raw_events;"
+```
+
+Flink web UI: http://localhost:8081 — xem job, checkpoint, throughput.
 
 ## Ghi chú
 
