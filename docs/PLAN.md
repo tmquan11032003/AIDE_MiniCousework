@@ -145,9 +145,10 @@ DQ tất cả PASS (uniqueness/referential/null/reconciliation khớp 54,734,865
 theo region/store, channel mix) + **point-in-time feature lookup**. Evidence: [reports/section_02_evidence.md](../reports/section_02_evidence.md).
 Trino để optional (DuckDB đã đủ serving). **Kết thúc Section 02 core / mini-phase data.**
 
-**M7 — Section 02 (orchestration): Airflow** (`airflow/`, LocalExecutor + Postgres)
-DAG điều phối: generator → Spark Bronze→Silver→Gold (SparkSubmitOperator) + submit/monitor Flink
-(BashOperator → Flink REST) + trigger Feast materialize. _Done:_ DAG chạy, job Spark thành công, Gold cập nhật.
+**M7 — Section 02 (orchestration): Airflow** ✅ **(XONG)** (`airflow/`, LocalExecutor + Postgres, profile `orchestration`)
+DAG `batch_pipeline` điều phối Spark `bronze_load → silver → gold → dq_checks` qua `docker exec spark-submit`
+(Airflow image có docker CLI + mount host socket, `group_add: 984`). _Done:_ DAG trigger → tất cả task
+**success** tuần tự, Gold dựng lại (fact_orders 200k). Compose profiles core/stream/orchestration để bật-tắt RAM.
 
 **M8 — Section 02 (feature store): Feast** (`feast/feature_repo/`)
 Offline đọc `feat_*` (Parquet/Iceberg trên MinIO), online SQLite, registry file. `get_historical_features`

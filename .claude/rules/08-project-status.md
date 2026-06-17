@@ -25,6 +25,9 @@
   - Tài liệu [02_schema_design.md](../../docs/02_schema_design.md) + [evidence](../../reports/section_02_evidence.md).
   - Lưu ý: metadata table Iceberg (`.snapshots`) qua REST catalog kén cú pháp trong Spark → time-travel demo dùng TIMESTAMP AS OF thay vì snapshot-id.
 - **M6 — serving (DuckDB) ✅ XONG:** `src/serving/duckdb_serving.py` đọc Gold trên MinIO — BI queries (revenue theo region/store, channel mix) + point-in-time feature lookup. Trino để optional. Evidence cập nhật.
-  - **Section 02 core (M3–M6) XONG = nền data lakehouse hoàn chỉnh (batch + streaming).** Tiếp theo: **M7 Airflow → M8 Feast → M9 DataHub** (orchestration + feature store + lineage).
+  - **Section 02 core (M3–M6) XONG = nền data lakehouse hoàn chỉnh (batch + streaming).**
+- **M7 — Airflow orchestration ✅ XONG:** profile `orchestration` (Airflow standalone LocalExecutor + Postgres). DAG `batch_pipeline` (`airflow/dags/`) điều phối Spark bronze→silver→gold→dq qua `docker exec spark-submit` (airflow image có docker CLI + mount host socket, group_add 984). Trigger → all task success. Compose dùng **profiles** (core/stream/orchestration) để bật-tắt RAM.
+  - ⚠️ Bài học: MinIO ban đầu chưa có volume bền → khi `up` recreate (lúc gắn volume) bị **mất data Iceberg cũ** (raw_events streaming). Giờ MinIO đã có bind volume → an toàn. silver.py đã sửa: chỉ tạo stg_events nếu raw_events tồn tại (decouple batch/streaming). Muốn có lại raw_events: chạy lại streaming path (M4).
+  - Tiếp theo: **M8 Feast → M9 DataHub**.
 - **Generator lib:** pandas + pyarrow (đã bỏ Polars/mimesis). Style: thủ tục, comment nhiều.
 - Cập nhật file này khi tiến độ thay đổi (generator chạy được, hạ tầng dựng xong, sang milestone mới...).

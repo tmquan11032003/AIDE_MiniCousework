@@ -79,3 +79,19 @@ hợp lệ, không rò rỉ tương lai.
 ```
 C008678  2025-06-29  orders_90d=14  aov_90d=320.7
 ```
+
+## Orchestration — Airflow (M7)
+
+DAG `batch_pipeline` (`airflow/dags/dag_batch_pipeline.py`) điều phối các Spark job qua
+`docker exec spark-iceberg spark-submit ...` (Airflow LocalExecutor + Postgres, profile `orchestration`).
+Một lần trigger chạy tuần tự, tất cả task **success**:
+
+```
+bronze_load  success
+silver       success   (phụ thuộc bronze_load)
+gold         success   (phụ thuộc silver)
+dq_checks    success   (phụ thuộc gold)
+```
+
+Sau khi DAG chạy: `gold.fact_orders` = 200,000, `gold.feat_customer_90d` = 19,409 (Gold được dựng lại bởi pipeline).
+Airflow UI: http://localhost:8082 (admin/admin).

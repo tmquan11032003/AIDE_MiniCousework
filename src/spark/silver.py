@@ -8,7 +8,7 @@ Key cleaning steps:
   - stg_events      : drop the ~1.5% duplicate streaming events (dedup by event_id).
   - stg_customers   : fill missing city with 'unknown'.
   - dims            : pass through with light typing.
-Orders keep channel / membership_tier_at_order NULL for pre-app months (schema evolution is intentional).
+Orders keep channel / membership_tier_at_order NULL for pre-app months (schema evolution).
 """
 
 from pyspark.sql import SparkSession
@@ -51,11 +51,12 @@ def main():
 
     save(spark.read.table(f"{B}.raw_payments"), "stg_payments")
 
-    # Streaming events: dedup by event_id (keep one).
-    save(
-        spark.read.table(f"{B}.raw_events").dropDuplicates(["event_id"]),
-        "stg_events",
-    )
+    # Streaming events: dedup by event_id (keep one). Only if the streaming Bronze
+    # table exists (produced by the Flink job, M4) -> batch pipeline stays independent.
+    if spark.catalog.tableExists(f"{B}.raw_events"):
+        save(spark.read.table(f"{B}.raw_events").dropDuplicates(["event_id"]), "stg_events")
+    else:
+        print("  skip stg_events (bronze.raw_events not found — run streaming path first)")
 
     spark.stop()
 

@@ -89,6 +89,7 @@ services:
   kafka:
     image: ${KAFKA_IMAGE}
     container_name: kafka
+    profiles: ["stream"]
     ports:
       - "29092:29092" # host access
     environment:
@@ -125,6 +126,7 @@ services:
       context: ./flink
     image: coffee-flink:1.19.1
     container_name: flink-jobmanager
+    profiles: ["stream"]
     command: jobmanager
     ports:
       - "8081:8081" # Flink web UI
@@ -144,6 +146,7 @@ services:
   flink-taskmanager:
     image: coffee-flink:1.19.1
     container_name: flink-taskmanager
+    profiles: ["stream"]
     command: taskmanager
     depends_on:
       - flink-jobmanager
@@ -156,6 +159,51 @@ services:
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 2
         taskmanager.memory.process.size: 1536m
+    networks: [lakehouse]
+
+  # --- Orchestration (M7): Airflow LocalExecutor + Postgres. Profile "orchestration". ---
+  airflow-postgres:
+    image: postgres:15-alpine
+    container_name: airflow-postgres
+    profiles: ["orchestration"]
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - ${HOST_DATA_DIR}/airflow-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [lakehouse]
+
+  airflow:
+    build:
+      context: ../airflow
+    image: coffee-airflow:2.10.4
+    container_name: airflow
+    profiles: ["orchestration"]
+    command: standalone
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+    # Access the host docker socket (gid 984) to run `docker exec spark-iceberg ...`.
+    group_add: ["984"]
+    user: "50000:0"
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=admin
+    ports:
+      - "8082:8080" # Airflow web UI (8080/8081 đã dùng cho Spark/Flink)
+    volumes:
+      - ../airflow/dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
     networks: [lakehouse]
 
 networks:

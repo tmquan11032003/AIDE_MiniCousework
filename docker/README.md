@@ -63,6 +63,31 @@ docker exec spark-iceberg spark-sql -e "SELECT count(*) FROM demo.bronze.raw_eve
 
 Flink web UI: http://localhost:8081 — xem job, checkpoint, throughput.
 
+## Compose profiles (bật-tắt theo RAM)
+
+Service `core` (minio/mc/rest/spark-iceberg) không có profile → luôn bật với `up`. Các cụm nặng dùng profile:
+
+```bash
+docker compose ... up -d                         # chỉ core
+docker compose ... --profile stream up -d         # core + kafka + flink (M4)
+docker compose ... --profile orchestration up -d  # core + airflow + postgres (M7)
+```
+
+## M7 — Orchestration: Airflow
+
+```bash
+docker compose --env-file docker/.env -f docker/docker-compose.yml --profile orchestration build airflow
+docker compose --env-file docker/.env -f docker/docker-compose.yml --profile orchestration up -d
+
+# DAG batch_pipeline điều phối bronze_load -> silver -> gold -> dq_checks (docker exec spark-submit)
+docker exec airflow airflow dags unpause batch_pipeline
+docker exec airflow airflow dags trigger batch_pipeline
+docker exec airflow airflow dags list-runs -d batch_pipeline
+```
+
+Airflow UI: http://localhost:8082 (admin/admin). Airflow image có docker CLI + mount host socket
+(`group_add: 984`) để `docker exec` sang container `spark-iceberg`.
+
 ## Ghi chú
 
 - Credentials (`admin`/`password`) chỉ dùng local, không phải secret thật.
