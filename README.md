@@ -44,6 +44,8 @@ pytest tests/ -q             # chạy test
 
 Mọi thứ tái lập được nhờ seed cố định trong `config/generator.yaml`.
 
+> 📖 **Chạy thử toàn bộ M1 → M8 (lakehouse + Airflow + Feast):** xem [docs/RUNBOOK.md](docs/RUNBOOK.md).
+
 ## Tiến độ
 
 - ✅ **Section 01 (M0–M2)**: generator offline + streaming + tài liệu + 16 test.
